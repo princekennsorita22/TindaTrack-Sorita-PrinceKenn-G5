@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Helper dashboard{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>Hi, {{ user.first_name_display }}</h1>
+  <p class="lede">What's happening at the counter?</p>
+</header>
+
+<section class="actions" aria-label="Counter tasks">
+  <div class="action">
+    <h2>Record a sale</h2>
+    <p>Cash or utang. Stock is deducted for you.</p>
+    <span class="soon-pill">Coming next</span>
+  </div>
+  <div class="action">
+    <h2>Record a restock</h2>
+    <p>Log new deliveries so the stock count stays right.</p>
+    <span class="soon-pill">Coming next</span>
+  </div>
+  <div class="action">
+    <h2>Take an utang payment</h2>
+    <p>Full or partial. The balance updates right away.</p>
+    <span class="soon-pill">Coming next</span>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Running low</h2>
+  <p class="empty">Nothing to restock yet. Items at or below their reorder level will show here.</p>
+</section>
+
+<p class="muted small">Prices, voiding sales and reports are handled by the store owner.</p>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "auth_base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<h1>Log in</h1>
+<p class="lede">Use the email and password you registered with.</p>
+<form method="post" novalidate class="form">
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  {% include "includes/field.html" with field=form.username %}
+  {% include "includes/field.html" with field=form.password %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <button type="submit" class="btn btn-primary btn-block">Log in</button>
+</form>
+<p class="switch">No account yet? <a href="{% url 'accounts:register' %}">Create an account</a></p>
+{% endblock %}

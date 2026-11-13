@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}My profile{% endblock %}
+{% block content %}
+<header class="page-head page-head-row">
+  <div class="profile-id">
+    {% include "includes/avatar.html" with u=profile_user size="lg" %}
+    <div>
+      <h1>{{ profile_user.full_name }}</h1>
+      <span class="tag tag-{{ profile_user.role|lower }}">{{ profile_user.get_role_display }}</span>
+    </div>
+  </div>
+  <a class="btn btn-primary" href="{% url 'accounts:profile_edit' %}">Edit profile</a>
+</header>
+
+<section class="panel">
+  <dl class="details">
+    <div><dt>Email address</dt><dd>{{ profile_user.email }}</dd></div>
+    <div><dt>Contact number</dt><dd>{{ profile_user.contact_number|default:"Not added" }}</dd></div>
+    <div><dt>Role</dt><dd>{{ profile_user.get_role_display }}</dd></div>
+    <div><dt>Member since</dt><dd>{{ profile_user.date_joined|date:"F j, Y" }}</dd></div>
+    <div><dt>Last login</dt><dd>{{ profile_user.last_login|date:"F j, Y, g:i A"|default:"—" }}</dd></div>
+  </dl>
+</section>
+
+<section class="panel">
+  <h2>Password</h2>
+  <p class="muted">Change it if you think someone else knows it.</p>
+  <a class="btn btn-quiet" href="{% url 'accounts:password_change' %}">Change password</a>
+</section>
+{% endblock %}

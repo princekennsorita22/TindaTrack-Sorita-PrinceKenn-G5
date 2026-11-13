@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block body_class %}auth{% endblock %}
+{% block body %}
+<div class="auth-wrap">
+  <section class="libreta" aria-hidden="true">
+    <div class="libreta-page">
+      <p class="hand">Aling Nena — 2 sardinas, 1 kape <s>₱68</s></p>
+      <p class="hand">Mang Ben — yelo, softdrinks <s>₱45</s></p>
+      <p class="hand">Joy — bigas 2kg ₱1?? <span class="smudge"></span></p>
+      <p class="hand faint">…page 14 missing</p>
+    </div>
+    <div class="libreta-caption">
+      <p class="brand brand-lg">Tinda<span>Track</span></p>
+      <p>Your store notebook, without the lost pages.</p>
+    </div>
+  </section>
+  <main class="auth-main">
+    {% include "includes/messages.html" %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}

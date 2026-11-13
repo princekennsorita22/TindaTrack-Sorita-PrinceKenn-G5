@@ -1,0 +1,44 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TindaTrack{% endblock %} · TindaTrack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Gochi+Hand&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+{% block body %}
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="{% url 'accounts:dashboard' %}">Tinda<span>Track</span></a>
+    <details class="nav-toggle" open>
+      <summary>Menu</summary>
+      <nav aria-label="Main">
+        {% if user.is_owner %}{% include "includes/nav_owner.html" %}{% else %}{% include "includes/nav_helper.html" %}{% endif %}
+      </nav>
+    </details>
+    <div class="sidebar-user">
+      <a class="who" href="{% url 'accounts:profile' %}">
+        {% include "includes/avatar.html" with u=user size="sm" %}
+        <span>
+          <strong>{{ user.full_name }}</strong>
+          <span class="tag tag-{{ user.role|lower }}">{{ user.get_role_display }}</span>
+        </span>
+      </a>
+      <form method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-quiet btn-block">Log out</button>
+      </form>
+    </div>
+  </aside>
+  <main class="main" id="main">
+    {% include "includes/messages.html" %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}
+</body>
+</html>

@@ -1,0 +1,16 @@
+{% with name=request.resolver_match.url_name %}
+<ul class="nav">
+  <li><a href="{% url 'accounts:owner_dashboard' %}" {% if name == 'owner_dashboard' %}aria-current="page"{% endif %}>Dashboard</a></li>
+  <li class="nav-group">Store</li>
+  <li><span class="soon">Products</span></li>
+  <li><span class="soon">Categories</span></li>
+  <li><span class="soon">Stock log</span></li>
+  <li><span class="soon">Customers</span></li>
+  <li class="nav-group">Money</li>
+  <li><span class="soon">Sales</span></li>
+  <li><span class="soon">Utang ledger</span></li>
+  <li><span class="soon">Reports</span></li>
+  <li class="nav-group">Account</li>
+  <li><a href="{% url 'accounts:profile' %}" {% if name == 'profile' or name == 'profile_edit' or name == 'password_change' %}aria-current="page"{% endif %}>My profile</a></li>
+</ul>
+{% endwith %}

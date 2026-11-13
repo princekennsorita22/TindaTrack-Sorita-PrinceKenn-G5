@@ -1,0 +1,29 @@
+{% extends "auth_base.html" %}
+{% block title %}Create an account{% endblock %}
+{% block content %}
+<h1>Create an account</h1>
+<p class="lede">Owners manage the whole store. Helpers record sales, restocks and utang payments.</p>
+<form method="post" novalidate class="form">
+  {% csrf_token %}
+  {% include "includes/form_errors.html" %}
+  <fieldset class="field role-pick{% if form.role.errors %} has-error{% endif %}">
+    <legend>{{ form.role.label }}</legend>
+    <div class="role-options">
+      {% for radio in form.role %}
+      <label class="role-option">
+        {{ radio.tag }}
+        <span>{{ radio.choice_label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    {% for error in form.role.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </fieldset>
+  {% include "includes/field.html" with field=form.full_name %}
+  {% include "includes/field.html" with field=form.email %}
+  {% include "includes/field.html" with field=form.contact_number %}
+  {% include "includes/field.html" with field=form.password1 %}
+  {% include "includes/field.html" with field=form.password2 %}
+  <button type="submit" class="btn btn-primary btn-block">Create account</button>
+</form>
+<p class="switch">Already registered? <a href="{% url 'accounts:login' %}">Log in</a></p>
+{% endblock %}

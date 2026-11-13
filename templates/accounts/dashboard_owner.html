@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Owner dashboard{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>Good to see you, {{ user.first_name_display }}</h1>
+  <p class="lede">Here's how the store is doing today.</p>
+</header>
+
+<section class="tally" aria-label="Today at a glance">
+  <div class="tally-item">
+    <p class="tally-label">Sales today</p>
+    <p class="tally-value">—</p>
+    <p class="tally-note">Shows once sales recording is added.</p>
+  </div>
+  <div class="tally-item">
+    <p class="tally-label">Products low on stock</p>
+    <p class="tally-value">—</p>
+    <p class="tally-note">Counts items at or below their reorder level.</p>
+  </div>
+  <div class="tally-item">
+    <p class="tally-label">Utang still unpaid</p>
+    <p class="tally-value">—</p>
+    <p class="tally-note">Total balance across all customers.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Set up your store</h2>
+  <p class="muted">Do these in order — each step needs the one before it.</p>
+  <ol class="steps">
+    <li><strong>Add categories</strong><span>Group items like Canned goods, Drinks, Rice.</span></li>
+    <li><strong>Add products</strong><span>Set the cost price, selling price and reorder level.</span></li>
+    <li><strong>Add customers who buy on utang</strong><span>Give each one a credit limit.</span></li>
+    <li><strong>Record your first sale</strong><span>Stock goes down automatically.</span></li>
+  </ol>
+</section>
+
+<section class="panel panel-split">
+  <div>
+    <h2>Only owners can</h2>
+    <ul class="plain">
+      <li>Change selling prices</li>
+      <li>Deactivate or delete products</li>
+      <li>Void a sale</li>
+      <li>View sales and utang reports</li>
+    </ul>
+  </div>
+  <div>
+    <h2>Your helpers can</h2>
+    <ul class="plain">
+      <li>Record sales and restocks</li>
+      <li>Record utang payments</li>
+      <li>Look up products and customers</li>
+    </ul>
+  </div>
+</section>
+{% endblock %}
