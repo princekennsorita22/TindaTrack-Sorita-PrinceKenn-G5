@@ -93,3 +93,117 @@ class ProductFilterForm(_NoColonForm):
     stock = forms.ChoiceField(choices=STOCK_CHOICES, required=False, label="Stock")
     status = forms.ChoiceField(choices=STATUS_CHOICES, required=False, label="Status")
 
+
+# ======================================================================= stock movements
+from .models import StockMovement  # noqa: E402
+
+MAX_QTY = 10000
+
+
+class _QuantityMixin(forms.Form):
+    """Shared quantity / direction / reason fields and the signed quantity they produce."""
+
+    DIRECTION_CHOICES = [("add", "Add units"), ("remove", "Remove units")]
+
+    direction = forms.ChoiceField(choices=DIRECTION_CHOICES, initial="remove", required=False,
+                                  label="Add or remove", widget=forms.RadioSelect)
+    quantity = forms.IntegerField(min_value=1, max_value=MAX_QTY, label="Quantity",
+                                  error_messages={"min_value": "Enter at least 1.",
+                                                  "max_value": f"Enter {MAX_QTY:,} or less.",
+                                                  "required": "Enter how many units.",
+                                                  "invalid": "Enter a whole number."},
+                                  widget=forms.NumberInput(attrs={"min": "1", "inputmode": "numeric"}))
+    reason = forms.CharField(max_length=150, required=False, label="Reason",
+                             help_text="Needed for adjustments. Optional for restocks.",
+                             widget=forms.TextInput(attrs={"placeholder": "e.g. Delivery from supplier"}))
+
+    def movement_type_value(self):
+        raise NotImplementedError
+
+    def clean_reason(self):
+        return " ".join(self.cleaned_data.get("reason", "").split())
+
+    def clean(self):
+        cleaned = super().clean()
+        mtype = self.movement_type_value()
+        qty = cleaned.get("quantity")
+        if mtype == StockMovement.Type.ADJUSTMENT:
+            if cleaned.get("direction") not in ("add", "remove"):
+                self.add_error("direction", "Choose whether to add or remove units.")
+            if not cleaned.get("reason"):
+                self.add_error("reason", "Say why the stock is being adjusted, e.g. damaged, expired or miscounted.")
+        if qty:
+            remove = mtype == StockMovement.Type.ADJUSTMENT and cleaned.get("direction") == "remove"
+            cleaned["quantity_change"] = -qty if remove else qty
+        return cleaned
+
+
+class StockMovementForm(_QuantityMixin):
+    product = forms.ModelChoiceField(queryset=Product.objects.none(), label="Product",
+                                     empty_label="Choose a product",
+                                     error_messages={"required": "Choose a product."})
+    movement_type = forms.ChoiceField(choices=StockMovement.Type.choices, initial=StockMovement.Type.RESTOCK,
+                                      label="Type", widget=forms.RadioSelect)
+
+    field_order = ["movement_type", "product", "direction", "quantity", "reason"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["product"].queryset = Product.objects.active().select_related("category")
+        self.fields["product"].label_from_instance = (
+            lambda p: f"{p.name} ({p.product_code}) — {p.stock_qty} in stock")
+
+    def movement_type_value(self):
+        return self.cleaned_data.get("movement_type")
+
+    def clean(self):
+        cleaned = super().clean()
+        product, change = cleaned.get("product"), cleaned.get("quantity_change")
+        if product and change and product.stock_qty + change < 0:
+            self.add_error("quantity", f"Only {product.stock_qty} in stock, so you can remove at most {product.stock_qty}.")
+        return cleaned
+
+
+class StockMovementEditForm(_QuantityMixin):
+    """Edit the quantity and reason of an entry. Product and type stay fixed."""
+
+    def __init__(self, *args, movement, **kwargs):
+        self.movement = movement
+        if not kwargs.get("data"):
+            kwargs.setdefault("initial", {
+                "quantity": movement.quantity_abs, "reason": movement.reason,
+                "direction": "add" if movement.is_increase else "remove",
+            })
+        super().__init__(*args, **kwargs)
+        if movement.movement_type == StockMovement.Type.RESTOCK:
+            del self.fields["direction"]
+
+    def movement_type_value(self):
+        return self.movement.movement_type
+
+    def clean(self):
+        cleaned = super().clean()
+        change = cleaned.get("quantity_change")
+        product = self.movement.product
+        if change:
+            new_stock = product.stock_qty - self.movement.quantity_change + change
+            if new_stock < 0:
+                self.add_error("quantity", f"This would leave {product.name} below zero "
+                                           f"({product.stock_qty} in stock now).")
+        return cleaned
+
+
+class StockFilterForm(_NoColonForm):
+    TYPE_CHOICES = [("", "All types")] + list(StockMovement.Type.choices)
+
+    q = forms.CharField(required=False, label="Product",
+                        widget=forms.TextInput(attrs={"placeholder": "Name or code", "type": "search"}))
+    type = forms.ChoiceField(choices=TYPE_CHOICES, required=False, label="Type")
+    date_from = forms.DateField(required=False, label="From", widget=forms.DateInput(attrs={"type": "date"}))
+    date_to = forms.DateField(required=False, label="To", widget=forms.DateInput(attrs={"type": "date"}))
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("date_from") and cleaned.get("date_to") and cleaned["date_from"] > cleaned["date_to"]:
+            raise forms.ValidationError("The From date must be on or before the To date.")
+        return cleaned
