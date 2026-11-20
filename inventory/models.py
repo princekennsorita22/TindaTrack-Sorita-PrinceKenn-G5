@@ -86,3 +86,47 @@ class Product(models.Model):
     @property
     def margin(self):
         return self.selling_price - self.cost_price
+
+
+class StockMovement(models.Model):
+    """The `stock_movements` table from the SDD (BR-10 to BR-12).
+
+    Every change to a product's stock is saved here, with the user who made it.
+    Create, update and delete go through inventory/services.py so the product's
+    stock_qty always matches the log.
+    """
+
+    class Type(models.TextChoices):
+        RESTOCK = "RESTOCK", "Restock"
+        ADJUSTMENT = "ADJUSTMENT", "Adjustment"
+
+    movement_id = models.BigAutoField(primary_key=True)
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="movements")
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                    related_name="stock_movements", db_column="user_id")
+    movement_type = models.CharField(max_length=10, choices=Type.choices)
+    quantity_change = models.IntegerField(help_text="Positive adds units, negative removes them.")
+    reason = models.CharField(max_length=150, blank=True)
+    movement_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "stock_movements"
+        ordering = ["-movement_date", "-movement_id"]
+        constraints = [
+            models.CheckConstraint(condition=Q(movement_type__in=["RESTOCK", "ADJUSTMENT"]),
+                                   name="stock_movements_type_valid"),
+            models.CheckConstraint(condition=~Q(quantity_change=0), name="stock_movements_quantity_not_zero"),
+            models.CheckConstraint(condition=~Q(movement_type="RESTOCK") | Q(quantity_change__gt=0),
+                                   name="stock_movements_restock_positive"),
+        ]
+
+    def __str__(self):
+        return f"{self.get_movement_type_display()} {self.quantity_change:+d} {self.product.name}"
+
+    @property
+    def is_increase(self):
+        return self.quantity_change > 0
+
+    @property
+    def quantity_abs(self):
+        return abs(self.quantity_change)
