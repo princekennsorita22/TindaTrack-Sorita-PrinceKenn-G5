@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block content %}
+<header class="page-head page-head-row">
+  <div>
+    <p class="crumb"><a href="{% url 'inventory:product_list' %}">Products</a></p>
+    <h1>{{ product.name }}</h1>
+    <p class="muted"><span class="code">{{ product.product_code }}</span> {{ product.category.name }}
+      {% if not product.is_active %}<span class="badge badge-muted">Deactivated</span>{% endif %}</p>
+  </div>
+  <div class="head-actions">
+    {% if product.is_active %}
+    <a class="btn btn-primary" href="{% url 'inventory:movement_create' %}?product={{ product.pk }}&type=RESTOCK">Record restock</a>
+    <a class="btn btn-quiet" href="{% url 'inventory:movement_create' %}?product={{ product.pk }}&type=ADJUSTMENT">Adjust stock</a>
+    {% endif %}
+    {% if user.is_owner %}<a class="btn btn-quiet" href="{% url 'inventory:product_edit' product.pk %}">Edit</a>{% endif %}
+  </div>
+</header>
+
+<section class="stock-card{% if product.stock_qty == 0 %} is-out{% elif product.is_low_stock %} is-low{% endif %}">
+  <p class="stock-big">{{ product.stock_qty }}</p>
+  <div>
+    <p class="stock-unit">{{ product.get_unit_display|lower }}{{ product.stock_qty|pluralize }} in stock</p>
+    {% if product.stock_qty == 0 %}<p class="stock-msg">Out of stock. Restock soon.</p>
+    {% elif product.is_low_stock %}<p class="stock-msg">Low: at or below the reorder level of {{ product.reorder_level }}.</p>
+    {% else %}<p class="stock-msg">Reorder at {{ product.reorder_level }}.</p>{% endif %}
+  </div>
+</section>
+
+<section class="panel">
+  <dl class="details">
+    <div><dt>Selling price</dt><dd>₱{{ product.selling_price }} per {{ product.get_unit_display|lower }}</dd></div>
+    {% if user.is_owner %}
+    <div><dt>Cost price</dt><dd>₱{{ product.cost_price }}</dd></div>
+    <div><dt>Margin per unit</dt><dd>₱{{ product.margin }}</dd></div>
+    <div><dt>Added by</dt><dd>{{ product.created_by.full_name }}, {{ product.created_at|date:"M j, Y" }}</dd></div>
+    {% endif %}
+  </dl>
+</section>
+
+<section class="panel">
+  <h2>{% if user.is_owner %}Recent stock changes{% else %}Your recent stock changes{% endif %}</h2>
+  {% if history %}
+  <ul class="low-list">
+    {% for m in history %}
+    <li>
+      <span><strong class="{% if m.is_increase %}qty-in{% else %}qty-out{% endif %}">{% if m.is_increase %}+{% endif %}{{ m.quantity_change }}</strong>
+        {{ m.get_movement_type_display|lower }}{% if m.reason %} · {{ m.reason }}{% endif %}</span>
+      <span class="muted small">{{ m.movement_date|date:"M j, g:i A" }}{% if user.is_owner %} · {{ m.recorded_by.full_name }}{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="small"><a href="{% url 'inventory:movement_list' %}?q={{ product.product_code }}">See all in the stock log</a></p>
+  {% else %}
+  <p class="empty">No stock changes recorded yet.</p>
+  {% endif %}
+</section>
+
+{% if user.is_owner %}
+<section class="panel danger-zone">
+  <h2>Remove from sale</h2>
+  <p class="muted">{% if product.is_active %}Deactivating hides the product from the list but keeps its records.{% else %}This product is hidden from the list. Reactivate it to sell it again.{% endif %}</p>
+  <div class="form-actions">
+    <form method="post" action="{% url 'inventory:product_toggle_active' product.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-quiet">{% if product.is_active %}Deactivate product{% else %}Reactivate product{% endif %}</button>
+    </form>
+    <a class="btn btn-quiet danger-text" href="{% url 'inventory:product_delete' product.pk %}">Delete product</a>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

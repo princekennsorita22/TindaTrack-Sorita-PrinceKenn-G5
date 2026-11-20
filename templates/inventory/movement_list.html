@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Stock log{% endblock %}
+{% block content %}
+<header class="page-head page-head-row">
+  <div>
+    <h1>{% if user.is_owner %}Stock log{% else %}My stock log{% endif %}</h1>
+    <p class="lede">{% if user.is_owner %}Every restock and adjustment, by everyone in the store.{% else %}The restocks and adjustments you recorded.{% endif %}</p>
+  </div>
+  <a class="btn btn-primary" href="{% url 'inventory:movement_create' %}">Record stock change</a>
+</header>
+
+<form method="get" class="filters" role="search">
+  <div class="field">{{ form.q.label_tag }}{{ form.q }}</div>
+  <div class="field">{{ form.type.label_tag }}{{ form.type }}</div>
+  <div class="field">{{ form.date_from.label_tag }}{{ form.date_from }}</div>
+  <div class="field">{{ form.date_to.label_tag }}{{ form.date_to }}</div>
+  <div class="filter-actions">
+    <button type="submit" class="btn btn-quiet">Filter</button>
+    {% if filtered %}<a href="{% url 'inventory:movement_list' %}">Clear</a>{% endif %}
+  </div>
+</form>
+{% if form.non_field_errors %}<div class="form-errors" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+
+{% if movements %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr>
+      <th>Date</th><th>Product</th><th>Type</th><th class="num">Change</th><th>Reason</th>
+      {% if user.is_owner %}<th>By</th>{% endif %}<th><span class="sr-only">Actions</span></th>
+    </tr></thead>
+    <tbody>
+    {% for m in movements %}
+      <tr>
+        <td class="nowrap">{{ m.movement_date|date:"M j, Y" }}<span class="code">{{ m.movement_date|date:"g:i A" }}</span></td>
+        <td><a href="{% url 'inventory:product_detail' m.product.pk %}"><strong>{{ m.product.name }}</strong></a><span class="code">{{ m.product.product_code }}</span></td>
+        <td><span class="badge {% if m.movement_type == 'RESTOCK' %}badge-in{% else %}badge-muted{% endif %}">{{ m.get_movement_type_display }}</span></td>
+        <td class="num"><span class="{% if m.is_increase %}qty-in{% else %}qty-out{% endif %}">{% if m.is_increase %}+{% endif %}{{ m.quantity_change }}</span></td>
+        <td class="muted">{{ m.reason|default:"—" }}</td>
+        {% if user.is_owner %}<td>{{ m.recorded_by.full_name }}</td>{% endif %}
+        <td class="row-actions">
+          <a href="{% url 'inventory:movement_edit' m.pk %}">Edit</a>
+          <a class="danger-link" href="{% url 'inventory:movement_delete' m.pk %}">Delete</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% elif filtered %}
+<section class="panel empty-state">
+  <h2>No stock changes match</h2>
+  <p>Try other filters, or <a href="{% url 'inventory:movement_list' %}">clear them</a>.</p>
+</section>
+{% else %}
+<section class="panel empty-state">
+  <h2>No stock changes yet</h2>
+  <p>Record a restock when a delivery arrives, or an adjustment for damaged or expired items.</p>
+  <a class="btn btn-primary" href="{% url 'inventory:movement_create' %}">Record stock change</a>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Products{% endblock %}
+{% block content %}
+<header class="page-head page-head-row">
+  <div>
+    <h1>Products</h1>
+    <p class="lede">{% if user.is_owner %}Everything you sell, with prices and stock.{% else %}Look up prices and how many are in stock.{% endif %}</p>
+  </div>
+  {% if user.is_owner %}<a class="btn btn-primary" href="{% url 'inventory:product_create' %}">Add product</a>{% endif %}
+</header>
+
+<form method="get" class="filters" role="search">
+  <div class="field">{{ form.q.label_tag }}{{ form.q }}</div>
+  <div class="field">{{ form.category.label_tag }}{{ form.category }}</div>
+  <div class="field">{{ form.stock.label_tag }}{{ form.stock }}</div>
+  <div class="field">{{ form.status.label_tag }}{{ form.status }}</div>
+  <div class="filter-actions">
+    <button type="submit" class="btn btn-quiet">Filter</button>
+    {% if filtered %}<a href="{% url 'inventory:product_list' %}">Clear</a>{% endif %}
+  </div>
+</form>
+
+{% if products %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr>
+      <th>Product</th><th>Category</th>
+      {% if user.is_owner %}<th class="num">Cost</th>{% endif %}
+      <th class="num">Price</th><th class="num">In stock</th>
+    </tr></thead>
+    <tbody>
+    {% for p in products %}
+      <tr class="{% if not p.is_active %}is-inactive{% endif %}">
+        <td>
+          <a href="{% url 'inventory:product_detail' p.pk %}"><strong>{{ p.name }}</strong></a>
+          <span class="code">{{ p.product_code }}</span>
+          {% if not p.is_active %}<span class="badge badge-muted">Deactivated</span>{% endif %}
+        </td>
+        <td>{{ p.category.name }}</td>
+        {% if user.is_owner %}<td class="num">₱{{ p.cost_price }}</td>{% endif %}
+        <td class="num">₱{{ p.selling_price }}</td>
+        <td class="num">
+          <span class="stock{% if p.stock_qty == 0 %} stock-out{% elif p.is_low_stock %} stock-low{% endif %}">{{ p.stock_qty }} {{ p.get_unit_display|lower }}{{ p.stock_qty|pluralize }}</span>
+          {% if p.stock_qty == 0 %}<span class="badge badge-out">Out</span>{% elif p.is_low_stock %}<span class="badge badge-low">Low</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="muted small">{{ products|length }} product{{ products|length|pluralize }} shown.</p>
+{% elif filtered %}
+<section class="panel empty-state">
+  <h2>No products match</h2>
+  <p>Try another name or code, or <a href="{% url 'inventory:product_list' %}">clear the filters</a>.</p>
+</section>
+{% elif inactive_count %}
+<section class="panel empty-state">
+  <h2>No active products</h2>
+  <p>All {{ inactive_count }} product{{ inactive_count|pluralize }} are deactivated. <a href="?status=inactive">Show deactivated products</a></p>
+</section>
+{% else %}
+<section class="panel empty-state">
+  <h2>No products yet</h2>
+  {% if user.is_owner %}
+    {% if has_categories %}
+    <p>Add the items you sell. You'll set the price and reorder level for each.</p>
+    <a class="btn btn-primary" href="{% url 'inventory:product_create' %}">Add product</a>
+    {% else %}
+    <p>Add a category first — every product belongs to one.</p>
+    <a class="btn btn-primary" href="{% url 'inventory:category_create' %}">Add category</a>
+    {% endif %}
+  {% else %}
+  <p>The store owner hasn't added any products yet.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Delete{% endblock %}
+{% block content %}
+<section class="panel narrow">
+  {% if blocked %}
+  <h1>This can't be deleted</h1>
+  <p>{{ blocked_reason }}</p>
+  <a class="btn btn-quiet" href="{% if cancel_pk %}{% url cancel_url cancel_pk %}{% else %}{% url cancel_url %}{% endif %}">Go back</a>
+  {% else %}
+  <h1>Delete {{ object_label }}?</h1>
+  <p>{{ confirm_note|default:"This can't be undone." }}</p>
+  <form method="post" class="form-actions">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a class="btn btn-quiet" href="{% if cancel_pk %}{% url cancel_url cancel_pk %}{% else %}{% url cancel_url %}{% endif %}">Cancel</a>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

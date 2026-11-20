@@ -8,6 +8,7 @@ urlpatterns = [
     path("", RedirectView.as_view(pattern_name="accounts:dashboard", permanent=False), name="home"),
     path("admin/", admin.site.urls),
     path("", include("accounts.urls")),
+    path("inventory/", include("inventory.urls")),
 ]
 
 handler403 = "accounts.views.permission_denied"

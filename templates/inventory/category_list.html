@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Categories{% endblock %}
+{% block content %}
+<header class="page-head page-head-row">
+  <div>
+    <h1>Categories</h1>
+    <p class="lede">Groups for your products, like Canned goods or Drinks.</p>
+  </div>
+  {% if user.is_owner %}<a class="btn btn-primary" href="{% url 'inventory:category_create' %}">Add category</a>{% endif %}
+</header>
+
+{% if categories %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Description</th><th class="num">Products</th>{% if user.is_owner %}<th><span class="sr-only">Actions</span></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for c in categories %}
+      <tr>
+        <td><a href="{% url 'inventory:product_list' %}?category={{ c.pk }}&status=all"><strong>{{ c.name }}</strong></a></td>
+        <td class="muted">{{ c.description|default:"—" }}</td>
+        <td class="num">{{ c.product_count }}</td>
+        {% if user.is_owner %}
+        <td class="row-actions">
+          <a href="{% url 'inventory:category_edit' c.pk %}">Edit</a>
+          <a class="danger-link" href="{% url 'inventory:category_delete' c.pk %}">Delete</a>
+        </td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<section class="panel empty-state">
+  <h2>No categories yet</h2>
+  {% if user.is_owner %}
+  <p>Every product needs a category. Start with a few, like Canned goods, Drinks and Rice.</p>
+  <a class="btn btn-primary" href="{% url 'inventory:category_create' %}">Add category</a>
+  {% else %}
+  <p>The store owner hasn't added any categories yet.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

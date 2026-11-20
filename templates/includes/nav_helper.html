@@ -3,10 +3,11 @@
   <li><a href="{% url 'accounts:helper_dashboard' %}" {% if name == 'helper_dashboard' %}aria-current="page"{% endif %}>Dashboard</a></li>
   <li class="nav-group">Counter</li>
   <li><span class="soon">Record a sale</span></li>
-  <li><span class="soon">Record a restock</span></li>
+  <li><a href="{% url 'inventory:movement_create' %}" {% if name == "movement_create" %}aria-current="page"{% endif %}>Record stock change</a></li>
+  <li><a href="{% url 'inventory:movement_list' %}" {% if name == "movement_list" or name == "movement_edit" or name == "movement_delete" %}aria-current="page"{% endif %}>My stock log</a></li>
   <li><span class="soon">Utang payments</span></li>
   <li class="nav-group">Look up</li>
-  <li><span class="soon">Products</span></li>
+  <li><a href="{% url 'inventory:product_list' %}" {% if name|slice:":7" == "product" %}aria-current="page"{% endif %}>Products</a></li>
   <li><span class="soon">Customers</span></li>
   <li class="nav-group">Account</li>
   <li><a href="{% url 'accounts:profile' %}" {% if name == 'profile' or name == 'profile_edit' or name == 'password_change' %}aria-current="page"{% endif %}>My profile</a></li>
