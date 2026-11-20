@@ -9,7 +9,10 @@
       {% if not product.is_active %}<span class="badge badge-muted">Deactivated</span>{% endif %}</p>
   </div>
   <div class="head-actions">
-    {% block stock_actions %}{% endblock %}
+    {% if product.is_active %}
+    <a class="btn btn-primary" href="{% url 'inventory:movement_create' %}?product={{ product.pk }}&type=RESTOCK">Record restock</a>
+    <a class="btn btn-quiet" href="{% url 'inventory:movement_create' %}?product={{ product.pk }}&type=ADJUSTMENT">Adjust stock</a>
+    {% endif %}
     {% if user.is_owner %}<a class="btn btn-quiet" href="{% url 'inventory:product_edit' product.pk %}">Edit</a>{% endif %}
   </div>
 </header>
@@ -35,7 +38,23 @@
   </dl>
 </section>
 
-{% block history %}{% endblock %}
+<section class="panel">
+  <h2>{% if user.is_owner %}Recent stock changes{% else %}Your recent stock changes{% endif %}</h2>
+  {% if history %}
+  <ul class="low-list">
+    {% for m in history %}
+    <li>
+      <span><strong class="{% if m.is_increase %}qty-in{% else %}qty-out{% endif %}">{% if m.is_increase %}+{% endif %}{{ m.quantity_change }}</strong>
+        {{ m.get_movement_type_display|lower }}{% if m.reason %} · {{ m.reason }}{% endif %}</span>
+      <span class="muted small">{{ m.movement_date|date:"M j, g:i A" }}{% if user.is_owner %} · {{ m.recorded_by.full_name }}{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="small"><a href="{% url 'inventory:movement_list' %}?q={{ product.product_code }}">See all in the stock log</a></p>
+  {% else %}
+  <p class="empty">No stock changes recorded yet.</p>
+  {% endif %}
+</section>
 
 {% if user.is_owner %}
 <section class="panel danger-zone">

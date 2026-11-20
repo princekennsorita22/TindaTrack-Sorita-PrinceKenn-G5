@@ -59,14 +59,33 @@ def dashboard(request):
     return redirect("accounts:helper_dashboard")
 
 
+def _low_stock():
+    from inventory.models import Product
+    return Product.objects.active().low_stock().select_related("category").order_by("stock_qty", "name")
+
+
 @role_required(User.Role.OWNER)
 def owner_dashboard(request):
-    return render(request, "accounts/dashboard_owner.html")
+    from inventory.models import Category, Product, StockMovement
+    low = _low_stock()
+    return render(request, "accounts/dashboard_owner.html", {
+        "low_count": low.count(),
+        "low_items": low[:6],
+        "active_products": Product.objects.active().count(),
+        "has_categories": Category.objects.exists(),
+        "has_products": Product.objects.exists(),
+        "has_movements": StockMovement.objects.exists(),
+        "recent_movements": StockMovement.objects.select_related("product", "recorded_by")[:6],
+    })
 
 
 @role_required(User.Role.HELPER)
 def helper_dashboard(request):
-    return render(request, "accounts/dashboard_helper.html")
+    from inventory.models import StockMovement
+    return render(request, "accounts/dashboard_helper.html", {
+        "low_items": _low_stock()[:8],
+        "my_recent": StockMovement.objects.filter(recorded_by=request.user).select_related("product")[:5],
+    })
 
 
 # ---------------------------------------------------------------- profile
