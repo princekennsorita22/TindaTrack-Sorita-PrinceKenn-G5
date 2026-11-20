@@ -2,8 +2,8 @@
 <ul class="nav">
   <li><a href="{% url 'accounts:owner_dashboard' %}" {% if name == 'owner_dashboard' %}aria-current="page"{% endif %}>Dashboard</a></li>
   <li class="nav-group">Store</li>
-  <li><span class="soon">Products</span></li>
-  <li><span class="soon">Categories</span></li>
+  <li><a href="{% url 'inventory:product_list' %}" {% if name|slice:":7" == "product" %}aria-current="page"{% endif %}>Products</a></li>
+  <li><a href="{% url 'inventory:category_list' %}" {% if name|slice:":8" == "category" %}aria-current="page"{% endif %}>Categories</a></li>
   <li><span class="soon">Stock log</span></li>
   <li><span class="soon">Customers</span></li>
   <li class="nav-group">Money</li>

@@ -6,7 +6,7 @@
   <li><span class="soon">Record a restock</span></li>
   <li><span class="soon">Utang payments</span></li>
   <li class="nav-group">Look up</li>
-  <li><span class="soon">Products</span></li>
+  <li><a href="{% url 'inventory:product_list' %}" {% if name|slice:":7" == "product" %}aria-current="page"{% endif %}>Products</a></li>
   <li><span class="soon">Customers</span></li>
   <li class="nav-group">Account</li>
   <li><a href="{% url 'accounts:profile' %}" {% if name == 'profile' or name == 'profile_edit' or name == 'password_change' %}aria-current="page"{% endif %}>My profile</a></li>

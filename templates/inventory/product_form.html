@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{% if is_new %}Add product{% else %}Edit product{% endif %}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <p class="crumb"><a href="{% url 'inventory:product_list' %}">Products</a>{% if product %} / <a href="{% url 'inventory:product_detail' product.pk %}">{{ product.name }}</a>{% endif %}</p>
+  <h1>{% if is_new %}Add product{% else %}Edit {{ product.name }}{% endif %}</h1>
+  {% if is_new %}<p class="lede">New products start with 0 in stock. Record a restock to add units.</p>{% endif %}
+</header>
+<section class="panel narrow">
+  <form method="post" novalidate class="form">
+    {% csrf_token %}
+    {% include "includes/form_errors.html" %}
+    <div class="form-grid">
+      {% include "includes/field.html" with field=form.product_code %}
+      {% include "includes/field.html" with field=form.unit %}
+    </div>
+    {% include "includes/field.html" with field=form.name %}
+    {% include "includes/field.html" with field=form.category %}
+    <div class="form-grid">
+      {% include "includes/field.html" with field=form.cost_price %}
+      {% include "includes/field.html" with field=form.selling_price %}
+    </div>
+    {% include "includes/field.html" with field=form.reorder_level %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">{% if is_new %}Add product{% else %}Save changes{% endif %}</button>
+      <a class="btn btn-quiet" href="{% if product %}{% url 'inventory:product_detail' product.pk %}{% else %}{% url 'inventory:product_list' %}{% endif %}">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
