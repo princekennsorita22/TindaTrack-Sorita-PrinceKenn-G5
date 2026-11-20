@@ -8,26 +8,51 @@
 
 <section class="actions" aria-label="Counter tasks">
   <div class="action">
+    <h2>Record a restock</h2>
+    <p>A delivery arrived? Add the units to stock.</p>
+    <a class="btn btn-primary" href="{% url 'inventory:movement_create' %}?type=RESTOCK">Record restock</a>
+  </div>
+  <div class="action">
+    <h2>Adjust stock</h2>
+    <p>Damaged, expired or miscounted items.</p>
+    <a class="btn btn-quiet" href="{% url 'inventory:movement_create' %}?type=ADJUSTMENT">Adjust stock</a>
+  </div>
+  <div class="action">
     <h2>Record a sale</h2>
     <p>Cash or utang. Stock is deducted for you.</p>
     <span class="soon-pill">Coming next</span>
   </div>
-  <div class="action">
-    <h2>Record a restock</h2>
-    <p>Log new deliveries so the stock count stays right.</p>
-    <span class="soon-pill">Coming next</span>
-  </div>
-  <div class="action">
-    <h2>Take an utang payment</h2>
-    <p>Full or partial. The balance updates right away.</p>
-    <span class="soon-pill">Coming next</span>
-  </div>
 </section>
 
-<section class="panel">
-  <h2>Running low</h2>
-  <p class="empty">Nothing to restock yet. Items at or below their reorder level will show here.</p>
-</section>
+<div class="panel-split">
+  <section class="panel">
+    <h2>Running low</h2>
+    {% if low_items %}
+    <ul class="low-list">
+      {% for p in low_items %}
+      <li><a href="{% url 'inventory:product_detail' p.pk %}">{{ p.name }}</a>
+        <span class="{% if p.stock_qty == 0 %}stock-out{% else %}stock-low{% endif %}">{{ p.stock_qty }} left</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">Nothing to restock. Items at or below their reorder level will show here.</p>
+    {% endif %}
+  </section>
+  <section class="panel">
+    <h2>Your recent entries</h2>
+    {% if my_recent %}
+    <ul class="low-list">
+      {% for m in my_recent %}
+      <li><span><strong class="{% if m.is_increase %}qty-in{% else %}qty-out{% endif %}">{% if m.is_increase %}+{% endif %}{{ m.quantity_change }}</strong> {{ m.product.name }}</span>
+        <span class="muted small">{{ m.movement_date|date:"M j, g:i A" }}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="small"><a href="{% url 'inventory:movement_list' %}">Open my stock log</a></p>
+    {% else %}
+    <p class="empty">You haven't recorded any stock changes yet.</p>
+    {% endif %}
+  </section>
+</div>
 
-<p class="muted small">Prices, voiding sales and reports are handled by the store owner.</p>
+<p class="muted small">Prices, new products and other people's entries are handled by the store owner.</p>
 {% endblock %}

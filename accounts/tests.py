@@ -90,7 +90,7 @@ class RoleDashboardTests(TestCase):
         self.client.force_login(self.helper)
         resp = self.client.get(reverse("accounts:dashboard"), follow=True)
         self.assertRedirects(resp, reverse("accounts:helper_dashboard"))
-        self.assertContains(resp, "Record a sale")
+        self.assertContains(resp, "Record a restock")
 
     def test_helper_cannot_open_owner_dashboard(self):
         self.client.force_login(self.helper)
@@ -106,7 +106,7 @@ class RoleDashboardTests(TestCase):
         self.client.force_login(self.owner)
         resp = self.client.get(reverse("accounts:owner_dashboard"))
         self.assertContains(resp, "Reports")
-        self.assertContains(resp, "Set up your store")
+        self.assertContains(resp, "Products low on stock")
 
 
 class ProfileTests(TestCase):

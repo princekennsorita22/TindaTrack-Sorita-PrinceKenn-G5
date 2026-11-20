@@ -4,7 +4,7 @@
   <li class="nav-group">Store</li>
   <li><a href="{% url 'inventory:product_list' %}" {% if name|slice:":7" == "product" %}aria-current="page"{% endif %}>Products</a></li>
   <li><a href="{% url 'inventory:category_list' %}" {% if name|slice:":8" == "category" %}aria-current="page"{% endif %}>Categories</a></li>
-  <li><span class="soon">Stock log</span></li>
+  <li><a href="{% url 'inventory:movement_list' %}" {% if name|slice:":8" == "movement" %}aria-current="page"{% endif %}>Stock log</a></li>
   <li><span class="soon">Customers</span></li>
   <li class="nav-group">Money</li>
   <li><span class="soon">Sales</span></li>

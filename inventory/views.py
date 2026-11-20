@@ -7,8 +7,12 @@ from django.views.decorators.http import require_http_methods, require_POST
 from accounts.decorators import role_required
 from accounts.models import User
 
-from .forms import CategoryForm, ProductFilterForm, ProductForm
-from .models import Category, Product
+from django.core.exceptions import ValidationError
+
+from . import services
+from .forms import (CategoryForm, ProductFilterForm, ProductForm, StockFilterForm,
+                    StockMovementEditForm, StockMovementForm)
+from .models import Category, Product, StockMovement
 
 OWNER = User.Role.OWNER
 
@@ -103,7 +107,8 @@ def product_list(request):
 @login_required
 def product_detail(request, pk):
     product = get_object_or_404(Product.objects.select_related("category", "created_by"), pk=pk)
-    return render(request, "inventory/product_detail.html", {"product": product})
+    history = visible_movements(request.user).filter(product=product)[:10]
+    return render(request, "inventory/product_detail.html", {"product": product, "history": history})
 
 
 @role_required(OWNER)
@@ -176,4 +181,115 @@ def product_delete(request, pk):
 
 
 def _has_history(product):
-    return hasattr(product, "movements") and product.movements.exists()
+    return product.movements.exists()
+
+
+# ======================================================================= stock movements
+def visible_movements(user):
+    """Owners see every stock entry; helpers see only the entries they recorded."""
+    qs = StockMovement.objects.select_related("product", "recorded_by")
+    return qs if user.is_owner else qs.filter(recorded_by=user)
+
+
+@login_required
+def movement_list(request):
+    form = StockFilterForm(request.GET or None)
+    movements = visible_movements(request.user)
+    if form.is_valid():
+        data = form.cleaned_data
+        if data.get("q"):
+            movements = movements.filter(Q(product__name__icontains=data["q"]) |
+                                         Q(product__product_code__icontains=data["q"]))
+        if data.get("type"):
+            movements = movements.filter(movement_type=data["type"])
+        if data.get("date_from"):
+            movements = movements.filter(movement_date__date__gte=data["date_from"])
+        if data.get("date_to"):
+            movements = movements.filter(movement_date__date__lte=data["date_to"])
+    return render(request, "inventory/movement_list.html", {
+        "form": form, "movements": movements[:200], "filtered": bool(request.GET),
+    })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def movement_create(request):
+    initial = {}
+    if request.method == "GET":
+        if request.GET.get("product"):
+            initial["product"] = request.GET["product"]
+        if request.GET.get("type") in StockMovement.Type.values:
+            initial["movement_type"] = request.GET["type"]
+    form = StockMovementForm(request.POST or None, initial=initial)
+    if request.method == "POST":
+        if form.is_valid():
+            data = form.cleaned_data
+            try:
+                movement = services.record_movement(
+                    product=data["product"], user=request.user, movement_type=data["movement_type"],
+                    quantity_change=data["quantity_change"], reason=data["reason"])
+            except ValidationError as e:
+                form.add_error(None, e)
+            else:
+                p = movement.product
+                verb = "added to" if movement.is_increase else "removed from"
+                messages.success(request, f"{movement.quantity_abs} {verb} {p.name}. Stock is now {p.stock_qty}.")
+                if p.is_low_stock:
+                    messages.warning(request, f"{p.name} is low on stock ({p.stock_qty} left, reorder level {p.reorder_level}).")
+                if request.POST.get("next") == "product":
+                    return redirect("inventory:product_detail", pk=p.pk)
+                return redirect("inventory:movement_list")
+        messages.error(request, "The stock change wasn't saved. Fix the highlighted fields.")
+    return render(request, "inventory/movement_form.html", {
+        "form": form, "from_product": bool(request.GET.get("product") or request.POST.get("next") == "product"),
+        "has_products": Product.objects.active().exists(),
+    })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def movement_edit(request, pk):
+    # A helper asking for someone else's entry gets a 404, as if it didn't exist.
+    movement = get_object_or_404(visible_movements(request.user), pk=pk)
+    form = StockMovementEditForm(request.POST or None, movement=movement)
+    if request.method == "POST":
+        if form.is_valid():
+            try:
+                services.update_movement(movement, quantity_change=form.cleaned_data["quantity_change"],
+                                         reason=form.cleaned_data["reason"])
+            except ValidationError as e:
+                form.add_error(None, e)
+            else:
+                movement.product.refresh_from_db()
+                messages.success(request, f"Stock entry saved. {movement.product.name} now has "
+                                          f"{movement.product.stock_qty} in stock.")
+                return redirect("inventory:movement_list")
+        messages.error(request, "The stock entry wasn't saved. Fix the highlighted fields.")
+    return render(request, "inventory/movement_edit.html", {"form": form, "movement": movement})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def movement_delete(request, pk):
+    movement = get_object_or_404(visible_movements(request.user), pk=pk)
+    product = movement.product
+    blocked = product.stock_qty - movement.quantity_change < 0
+    if request.method == "POST":
+        try:
+            services.delete_movement(movement)
+        except ValidationError as e:
+            messages.error(request, e.messages[0])
+            return redirect("inventory:movement_list")
+        product.refresh_from_db()
+        messages.success(request, f"Stock entry deleted. {product.name} now has {product.stock_qty} in stock.")
+        return redirect("inventory:movement_list")
+    sign = "-" if movement.is_increase else "+"
+    return render(request, "inventory/confirm_delete.html", {
+        "object_label": f"this {movement.get_movement_type_display().lower()} of {movement.quantity_abs} {product.name}",
+        "confirm_note": f"Stock goes from {product.stock_qty} to {product.stock_qty - movement.quantity_change} "
+                        f"({sign}{movement.quantity_abs}). This can't be undone.",
+        "blocked": blocked,
+        "blocked_reason": f"Some of these units have already left stock ({product.stock_qty} left), so deleting "
+                          "this entry would put the product below zero. Record an adjustment instead.",
+        "cancel_url": "inventory:movement_list",
+    })

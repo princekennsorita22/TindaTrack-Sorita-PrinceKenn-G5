@@ -14,43 +14,75 @@
   </div>
   <div class="tally-item">
     <p class="tally-label">Products low on stock</p>
-    <p class="tally-value">—</p>
-    <p class="tally-note">Counts items at or below their reorder level.</p>
+    <p class="tally-value"><a href="{% url 'inventory:product_list' %}?stock=low">{{ low_count }}</a></p>
+    <p class="tally-note">Out of {{ active_products }} active product{{ active_products|pluralize }}, at or below their reorder level.</p>
   </div>
   <div class="tally-item">
     <p class="tally-label">Utang still unpaid</p>
     <p class="tally-value">—</p>
-    <p class="tally-note">Total balance across all customers.</p>
+    <p class="tally-note">Shows once the utang ledger is added.</p>
   </div>
 </section>
 
+{% if not has_movements %}
 <section class="panel">
   <h2>Set up your store</h2>
   <p class="muted">Do these in order — each step needs the one before it.</p>
   <ol class="steps">
-    <li><strong>Add categories</strong><span>Group items like Canned goods, Drinks, Rice.</span></li>
-    <li><strong>Add products</strong><span>Set the cost price, selling price and reorder level.</span></li>
-    <li><strong>Add customers who buy on utang</strong><span>Give each one a credit limit.</span></li>
-    <li><strong>Record your first sale</strong><span>Stock goes down automatically.</span></li>
+    <li><strong>{% if has_categories %}✓ {% endif %}<a href="{% url 'inventory:category_list' %}">Add categories</a></strong><span>Group items like Canned goods, Drinks, Rice.</span></li>
+    <li><strong>{% if has_products %}✓ {% endif %}<a href="{% url 'inventory:product_list' %}">Add products</a></strong><span>Set the cost price, selling price and reorder level.</span></li>
+    <li><strong><a href="{% url 'inventory:movement_create' %}">Record your first restock</a></strong><span>New products start at 0 until you add stock.</span></li>
   </ol>
 </section>
+{% endif %}
+
+<div class="panel-split">
+  <section class="panel">
+    <h2>Restock soon</h2>
+    {% if low_items %}
+    <ul class="low-list">
+      {% for p in low_items %}
+      <li><a href="{% url 'inventory:product_detail' p.pk %}">{{ p.name }}</a>
+        <span class="{% if p.stock_qty == 0 %}stock-out{% else %}stock-low{% endif %}">{{ p.stock_qty }} left</span></li>
+      {% endfor %}
+    </ul>
+    {% if low_count > low_items|length %}<p class="small"><a href="{% url 'inventory:product_list' %}?stock=low">See all {{ low_count }}</a></p>{% endif %}
+    {% else %}
+    <p class="empty">Nothing is low right now.</p>
+    {% endif %}
+  </section>
+  <section class="panel">
+    <h2>Latest stock changes</h2>
+    {% if recent_movements %}
+    <ul class="low-list">
+      {% for m in recent_movements %}
+      <li><span><strong class="{% if m.is_increase %}qty-in{% else %}qty-out{% endif %}">{% if m.is_increase %}+{% endif %}{{ m.quantity_change }}</strong> {{ m.product.name }}</span>
+        <span class="muted small">{{ m.recorded_by.first_name_display }}, {{ m.movement_date|date:"M j" }}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="small"><a href="{% url 'inventory:movement_list' %}">Open the stock log</a></p>
+    {% else %}
+    <p class="empty">No restocks or adjustments yet.</p>
+    {% endif %}
+  </section>
+</div>
 
 <section class="panel panel-split">
   <div>
     <h2>Only owners can</h2>
     <ul class="plain">
+      <li>Add and edit products and categories</li>
       <li>Change selling prices</li>
       <li>Deactivate or delete products</li>
-      <li>Void a sale</li>
-      <li>View sales and utang reports</li>
+      <li>See and fix everyone's stock entries</li>
     </ul>
   </div>
   <div>
     <h2>Your helpers can</h2>
     <ul class="plain">
-      <li>Record sales and restocks</li>
-      <li>Record utang payments</li>
-      <li>Look up products and customers</li>
+      <li>Look up products and prices</li>
+      <li>Record restocks and adjustments</li>
+      <li>Fix only the stock entries they made</li>
     </ul>
   </div>
 </section>
