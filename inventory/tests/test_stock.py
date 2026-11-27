@@ -167,3 +167,28 @@ class StockConstraintTests(TestCase):
         for kw in bad:
             with self.subTest(**kw), self.assertRaises(IntegrityError), transaction.atomic():
                 StockMovement.objects.create(product=p, recorded_by=owner, **kw)
+
+
+class PaginationTests(TestCase):
+    """ISS-03: long lists are paged and bad page numbers don't crash."""
+
+    def setUp(self):
+        self.owner = make_user("owner@example.com", "OWNER")
+        self.product = make_product(self.owner)
+        StockMovement.objects.bulk_create([
+            StockMovement(product=self.product, recorded_by=self.owner, movement_type="RESTOCK", quantity_change=1)
+            for _ in range(30)])
+        self.client.force_login(self.owner)
+
+    def test_stock_log_pages(self):
+        url = reverse("inventory:movement_list")
+        self.assertEqual(len(self.client.get(url).context["movements"]), 25)
+        resp = self.client.get(url + "?type=RESTOCK&page=2")
+        self.assertEqual(len(resp.context["movements"]), 5)
+        self.assertContains(resp, "Page 2 of 2")
+        self.assertContains(resp, "type=RESTOCK&amp;page=1")
+
+    def test_bad_page_numbers(self):
+        url = reverse("inventory:movement_list")
+        for page in ["abc", "0", "-1", "999"]:
+            self.assertEqual(self.client.get(url + f"?page={page}").status_code, 200, page)
