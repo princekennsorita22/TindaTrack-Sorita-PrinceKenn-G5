@@ -8,6 +8,17 @@ from accounts.decorators import role_required
 from accounts.models import User
 
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+
+PAGE_SIZE = 25
+
+
+def paginate(request, queryset):
+    """ISS-03: page long lists. get_page() turns a bad ?page= value into page 1 or the last page."""
+    page = Paginator(queryset, PAGE_SIZE).get_page(request.GET.get("page"))
+    query = request.GET.copy()
+    query.pop("page", None)
+    return page, query.urlencode()
 
 from . import services
 from .forms import (CategoryForm, ProductFilterForm, ProductForm, StockFilterForm,
@@ -96,8 +107,9 @@ def product_list(request):
         products = products.filter(is_active=True)
     elif status == "inactive":
         products = products.filter(is_active=False)
+    page, page_query = paginate(request, products)
     return render(request, "inventory/product_list.html", {
-        "form": form, "products": products,
+        "form": form, "products": page.object_list, "page_obj": page, "page_query": page_query,
         "has_categories": Category.objects.exists(),
         "inactive_count": Product.objects.filter(is_active=False).count(),
         "filtered": bool(request.GET),
@@ -206,8 +218,10 @@ def movement_list(request):
             movements = movements.filter(movement_date__date__gte=data["date_from"])
         if data.get("date_to"):
             movements = movements.filter(movement_date__date__lte=data["date_to"])
+    page, page_query = paginate(request, movements)
     return render(request, "inventory/movement_list.html", {
-        "form": form, "movements": movements[:200], "filtered": bool(request.GET),
+        "form": form, "movements": page.object_list, "page_obj": page, "page_query": page_query,
+        "filtered": bool(set(request.GET) - {"page"}),
     })
 
 
