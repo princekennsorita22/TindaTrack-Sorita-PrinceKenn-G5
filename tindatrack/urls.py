@@ -14,3 +14,6 @@ urlpatterns = [
 ]
 
 handler403 = "accounts.views.permission_denied"
+handler400 = "accounts.views.bad_request"
+handler404 = "accounts.views.page_not_found"
+handler500 = "accounts.views.server_error"

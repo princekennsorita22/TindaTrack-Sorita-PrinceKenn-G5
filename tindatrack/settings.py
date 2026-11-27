@@ -113,6 +113,29 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Bootstrap-style names for message levels so templates can style them.
+# --- Security ----------------------------------------------------------------
+# DEBUG comes from .env and defaults to False, so a missing setting never shows tracebacks.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_AGE = 60 * 60 * 12          # log out after 12 hours
+# Send cookies only over HTTPS when deployed (set SECURE_COOKIES=True in .env on the server).
+SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = env_bool("SECURE_COOKIES", not DEBUG)
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+# Reject huge uploads and form posts before they reach the views.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+
+# Errors go to the console (and the host's logs) instead of the browser.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"django": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "WARNING")}},
+}
+
 from django.contrib.messages import constants as message_constants  # noqa: E402
 
 MESSAGE_TAGS = {message_constants.ERROR: "error"}
