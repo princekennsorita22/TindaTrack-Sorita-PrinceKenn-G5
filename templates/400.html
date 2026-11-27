@@ -1,0 +1,8 @@
+{% extends "error_base.html" %}
+{% block title %}Bad request{% endblock %}
+{% block code %}400{% endblock %}
+{% block content %}
+<h1>Something about that request wasn't right</h1>
+<p>Go back and try again. If you submitted a form, reload the page first.</p>
+<a class="btn btn-primary" href="/">Go to my dashboard</a>
+{% endblock %}

@@ -9,7 +9,7 @@ from django.utils._os import safe_join
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib.messages.views import SuccessMessageMixin
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_http_methods, require_POST, require_safe
@@ -28,13 +28,19 @@ def register(request):
     if request.method == "POST":
         form = RegisterForm(request.POST)
         if form.is_valid():
-            with transaction.atomic():
-                user = form.save(commit=False)
-                # ISS-01: the very first account sets up the store and becomes its owner.
-                # Every later sign-up is a helper; an owner can promote them on the Team page.
-                is_first = not User.objects.filter(role=User.Role.OWNER).exists()
-                user.role = User.Role.OWNER if is_first else User.Role.HELPER
-                user.save()
+            try:
+                with transaction.atomic():
+                    user = form.save(commit=False)
+                    # ISS-01: the very first account sets up the store and becomes its owner.
+                    # Every later sign-up is a helper; an owner can promote them on the Team page.
+                    is_first = not User.objects.filter(role=User.Role.OWNER).exists()
+                    user.role = User.Role.OWNER if is_first else User.Role.HELPER
+                    user.save()
+            except IntegrityError:
+                # Someone registered the same email a moment earlier (UNIQUE in PostgreSQL).
+                form.add_error("email", "An account with this email already exists. Log in instead.")
+                messages.error(request, "Your account wasn't created. Fix the highlighted fields and try again.")
+                return render(request, "accounts/register.html", {"form": form})
             if is_first:
                 messages.success(request, f"Store owner account created for {user.email}. Log in to continue.")
             else:
@@ -70,6 +76,7 @@ class LogoutView(auth_views.LogoutView):
 
 # ---------------------------------------------------------------- dashboards
 @login_required
+@require_safe
 def dashboard(request):
     """Sends each user to the dashboard for their role."""
     if request.user.is_owner:
@@ -83,6 +90,7 @@ def _low_stock():
 
 
 @role_required(User.Role.OWNER)
+@require_safe
 def owner_dashboard(request):
     from inventory.models import Category, Product, StockMovement
     low = _low_stock()
@@ -98,6 +106,7 @@ def owner_dashboard(request):
 
 
 @role_required(User.Role.HELPER)
+@require_safe
 def helper_dashboard(request):
     from inventory.models import StockMovement
     return render(request, "accounts/dashboard_helper.html", {
@@ -110,6 +119,7 @@ def helper_dashboard(request):
 # Both views use request.user, never an id from the URL, so a user can only
 # ever see or change their own profile.
 @login_required
+@require_safe
 def profile(request):
     return render(request, "accounts/profile.html", {"profile_user": request.user})
 
@@ -125,14 +135,18 @@ def profile_edit(request):
     if request.method == "POST":
         form = ProfileForm(request.POST, request.FILES, instance=me)
         if form.is_valid():
-            with transaction.atomic():
-                user = form.save()
-                if old_photo and old_photo != user.profile_photo.name:
-                    # Remove the replaced or cleared photo only after the save is committed.
-                    storage = user.profile_photo.storage
-                    transaction.on_commit(lambda: storage.delete(old_photo))
-            messages.success(request, "Profile saved.")
-            return redirect("accounts:profile")
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    if old_photo and old_photo != user.profile_photo.name:
+                        # Remove the replaced or cleared photo only after the save is committed.
+                        storage = user.profile_photo.storage
+                        transaction.on_commit(lambda: storage.delete(old_photo))
+            except IntegrityError:
+                form.add_error("email", "Another account already uses this email.")
+            else:
+                messages.success(request, "Profile saved.")
+                return redirect("accounts:profile")
         messages.error(request, "Your profile wasn't saved. Fix the highlighted fields and try again.")
     else:
         form = ProfileForm(instance=me)
@@ -148,6 +162,7 @@ class PasswordChangeView(SuccessMessageMixin, auth_views.PasswordChangeView):
 
 # ---------------------------------------------------------------- team (owner only)
 @role_required(User.Role.OWNER)
+@require_safe
 def team(request):
     members = User.objects.filter(is_active=True).order_by("role", "full_name")
     return render(request, "accounts/team.html", {"members": members, "role_choices": User.Role.choices})
@@ -176,6 +191,26 @@ def team_change_role(request, pk):
 
 def permission_denied(request, exception=None):
     return render(request, "403.html", status=403)
+
+
+def csrf_failure(request, reason=""):
+    return render(request, "403_csrf.html", status=403)
+
+
+def page_not_found(request, exception=None):
+    return render(request, "404.html", status=404)
+
+
+def bad_request(request, exception=None):
+    return render(request, "400.html", status=400)
+
+
+def server_error(request):
+    # No request context here on purpose: if the error came from the database or a
+    # context processor, rendering the normal layout could fail again.
+    from django.template import loader
+    from django.http import HttpResponseServerError
+    return HttpResponseServerError(loader.get_template("500.html").render())
 
 
 # ---------------------------------------------------------------- uploaded files

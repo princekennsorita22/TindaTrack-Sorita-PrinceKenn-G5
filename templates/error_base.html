@@ -1,0 +1,16 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Error{% endblock %} · TindaTrack</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="error-page">
+  <main class="error-wrap">
+    <p class="brand">Tinda<span>Track</span></p>
+    <p class="error-code">{% block code %}{% endblock %}</p>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
