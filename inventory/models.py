@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Q
+from django.db.models.functions import Lower, Upper
 
 
 class Category(models.Model):
@@ -21,6 +22,11 @@ class Category(models.Model):
         db_table = "categories"
         ordering = ["name"]
         verbose_name_plural = "categories"
+        constraints = [
+            # "Drinks" and "drinks" count as the same category (BR-04), checked by PostgreSQL too.
+            models.UniqueConstraint(Lower("name"), name="categories_name_unique_ci"),
+            models.CheckConstraint(condition=~Q(name=""), name="categories_name_not_blank"),
+        ]
 
     def __str__(self):
         return self.name
@@ -74,6 +80,9 @@ class Product(models.Model):
             models.CheckConstraint(condition=Q(cost_price__gte=0), name="products_cost_price_not_negative"),
             models.CheckConstraint(condition=Q(stock_qty__gte=0), name="products_stock_qty_not_negative"),
             models.CheckConstraint(condition=Q(reorder_level__gte=0), name="products_reorder_level_not_negative"),
+            models.CheckConstraint(condition=Q(product_code=Upper("product_code")) & ~Q(product_code=""),
+                                   name="products_code_uppercase"),
+            models.CheckConstraint(condition=~Q(name=""), name="products_name_not_blank"),
         ]
 
     def __str__(self):
@@ -118,6 +127,11 @@ class StockMovement(models.Model):
             models.CheckConstraint(condition=~Q(quantity_change=0), name="stock_movements_quantity_not_zero"),
             models.CheckConstraint(condition=~Q(movement_type="RESTOCK") | Q(quantity_change__gt=0),
                                    name="stock_movements_restock_positive"),
+            models.CheckConstraint(condition=Q(quantity_change__gte=-10000) & Q(quantity_change__lte=10000),
+                                   name="stock_movements_quantity_in_range"),
+            # An adjustment must say why (damaged, expired, miscounted).
+            models.CheckConstraint(condition=~Q(movement_type="ADJUSTMENT") | ~Q(reason=""),
+                                   name="stock_movements_adjustment_has_reason"),
         ]
 
     def __str__(self):

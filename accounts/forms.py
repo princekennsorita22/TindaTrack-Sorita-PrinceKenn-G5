@@ -18,12 +18,13 @@ class RegisterForm(UserCreationForm):
     email = forms.EmailField(max_length=100, label="Email address")
     contact_number = forms.CharField(max_length=13, required=False, label="Contact number",
                                      help_text="Example: 09171234567")
-    role = forms.ChoiceField(choices=User.Role.choices, label="I am the",
-                             widget=forms.RadioSelect, initial=User.Role.HELPER)
+
+    # ISS-01: there is no role field. The view decides the role (first account = owner,
+    # everyone after = helper), so nobody can make themselves an owner by registering.
 
     class Meta:
         model = User
-        fields = ("full_name", "email", "contact_number", "role")
+        fields = ("full_name", "email", "contact_number")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -97,8 +98,14 @@ class ProfileForm(forms.ModelForm):
 
     def clean_profile_photo(self):
         photo = self.cleaned_data.get("profile_photo")
-        if photo and hasattr(photo, "size") and photo.size > MAX_PHOTO_MB * 1024 * 1024:
-            raise forms.ValidationError(f"The photo is larger than {MAX_PHOTO_MB} MB. Choose a smaller file.")
+        # Only check newly uploaded files (an existing photo has no content_type).
+        if photo and hasattr(photo, "content_type"):
+            if photo.size > MAX_PHOTO_MB * 1024 * 1024:
+                raise forms.ValidationError(f"The photo is larger than {MAX_PHOTO_MB} MB. Choose a smaller file.")
+            # ImageField already opened it with Pillow; this checks what the image really is.
+            image_format = getattr(getattr(photo, "image", None), "format", None)
+            if image_format not in ("JPEG", "PNG", "WEBP"):
+                raise forms.ValidationError("Upload a JPG, PNG or WebP image.")
         return photo
 
 
@@ -107,3 +114,9 @@ class StyledPasswordChangeForm(PasswordChangeForm):
         super().__init__(*args, **kwargs)
         self.fields["new_password1"].help_text = password_validation.password_validators_help_text_html()
         self.fields["new_password2"].label = "Confirm new password"
+
+
+class RoleChangeForm(forms.Form):
+    """Owner promotes a helper or makes an owner a helper again (ISS-01)."""
+
+    role = forms.ChoiceField(choices=User.Role.choices)

@@ -16,7 +16,7 @@ class RegistrationTests(TestCase):
 
     def post(self, **overrides):
         data = {"full_name": "Nena Cruz", "email": "nena@example.com", "contact_number": "09171234567",
-                "role": "OWNER", "password1": PASSWORD, "password2": PASSWORD}
+                "password1": PASSWORD, "password2": PASSWORD}
         data.update(overrides)
         return self.client.post(self.url, data, follow=True)
 
@@ -27,7 +27,7 @@ class RegistrationTests(TestCase):
         self.assertNotEqual(user.password, PASSWORD)
         self.assertTrue(user.password.startswith("pbkdf2_sha256$"))
         self.assertTrue(user.check_password(PASSWORD))
-        self.assertIn("Account created", [str(m) for m in get_messages(resp.wsgi_request)][0])
+        self.assertIn("account created", [str(m) for m in get_messages(resp.wsgi_request)][0])
 
     def test_required_fields(self):
         resp = self.post(full_name="", email="")
@@ -155,3 +155,129 @@ class RoleConstraintTests(TestCase):
         from django.db import IntegrityError
         with self.assertRaises(IntegrityError):
             User.objects.create_user(email="x@example.com", password=PASSWORD, full_name="X", role="ADMIN")
+
+
+class RoleOnSignupTests(TestCase):
+    """ISS-01: nobody can choose the owner role while registering."""
+
+    url = reverse("accounts:register")
+
+    def register(self, email, **extra):
+        data = {"full_name": "New Person", "email": email, "password1": PASSWORD, "password2": PASSWORD}
+        data.update(extra)
+        return self.client.post(self.url, data, follow=True)
+
+    def test_first_account_is_owner_then_helpers(self):
+        self.register("first@example.com")
+        self.register("second@example.com")
+        self.assertEqual(User.objects.get(email="first@example.com").role, "OWNER")
+        self.assertEqual(User.objects.get(email="second@example.com").role, "HELPER")
+
+    def test_posting_a_role_is_ignored(self):
+        make_user("owner@example.com", "OWNER")
+        resp = self.register("sneaky@example.com", role="OWNER")
+        self.assertContains(resp, "Helper account created")
+        self.assertEqual(User.objects.get(email="sneaky@example.com").role, "HELPER")
+
+
+class TeamTests(TestCase):
+    def setUp(self):
+        self.owner = make_user("owner@example.com", "OWNER", name="Nena Cruz")
+        self.helper = make_user("helper@example.com", "HELPER", name="Joy Reyes")
+
+    def test_owner_promotes_helper(self):
+        self.client.force_login(self.owner)
+        resp = self.client.post(reverse("accounts:team_change_role", args=[self.helper.pk]),
+                                {"role": "OWNER"}, follow=True)
+        self.assertContains(resp, "Joy Reyes is now a store owner.")
+        self.helper.refresh_from_db()
+        self.assertEqual(self.helper.role, "OWNER")
+
+    def test_owner_cannot_demote_self(self):
+        self.client.force_login(self.owner)
+        resp = self.client.post(reverse("accounts:team_change_role", args=[self.owner.pk]),
+                                {"role": "HELPER"}, follow=True)
+        self.assertContains(resp, "can&#x27;t remove your own owner role")
+        self.owner.refresh_from_db()
+        self.assertEqual(self.owner.role, "OWNER")
+
+    def test_helper_cannot_change_roles(self):
+        self.client.force_login(self.helper)
+        self.assertEqual(self.client.get(reverse("accounts:team")).status_code, 403)
+        resp = self.client.post(reverse("accounts:team_change_role", args=[self.helper.pk]), {"role": "OWNER"})
+        self.assertEqual(resp.status_code, 403)
+        self.helper.refresh_from_db()
+        self.assertEqual(self.helper.role, "HELPER")
+
+    def test_change_role_is_post_only_and_validates(self):
+        self.client.force_login(self.owner)
+        url = reverse("accounts:team_change_role", args=[self.helper.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        resp = self.client.post(url, {"role": "ADMIN"}, follow=True)
+        self.assertContains(resp, "Choose a valid role.")
+        self.assertEqual(self.client.post(reverse("accounts:team_change_role", args=[99999]),
+                                          {"role": "OWNER"}).status_code, 404)
+
+
+class ProfilePhotoTests(TestCase):
+    """ISS-02: photos are validated and served by a login-protected view."""
+
+    def setUp(self):
+        import shutil, tempfile
+        from django.test import override_settings
+        self.media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media, ignore_errors=True)
+        self.override = override_settings(MEDIA_ROOT=self.media)
+        self.override.enable()
+        self.addCleanup(self.override.disable)
+        self.user = make_user("joy@example.com", "HELPER", name="Joy Reyes")
+        self.client.force_login(self.user)
+
+    def png(self, name="me.png"):
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        buf = io.BytesIO()
+        Image.new("RGB", (20, 20), "green").save(buf, "PNG")
+        return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
+
+    def upload(self, photo):
+        return self.client.post(reverse("accounts:profile_edit"),
+                                {"full_name": "Joy Reyes", "email": "joy@example.com", "contact_number": "",
+                                 "profile_photo": photo}, follow=True)
+
+    def test_upload_and_serve_only_when_logged_in(self):
+        self.upload(self.png())
+        self.user.refresh_from_db()
+        url = self.user.profile_photo.url
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "image/png")
+        self.client.logout()
+        self.assertRedirects(self.client.get(url), f"{reverse('accounts:login')}?next={url}")
+
+    def test_replacing_photo_deletes_old_file(self):
+        import os
+        with self.captureOnCommitCallbacks(execute=True):
+            self.upload(self.png("first.png"))
+        self.user.refresh_from_db()
+        first = self.user.profile_photo.path
+        with self.captureOnCommitCallbacks(execute=True):
+            self.upload(self.png("second.png"))
+        self.assertFalse(os.path.exists(first))
+
+    def test_rejects_non_image(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        resp = self.upload(SimpleUploadedFile("evil.png", b"<script>alert(1)</script>", content_type="image/png"))
+        self.assertIn("profile_photo", resp.context["form"].errors)
+
+    def test_media_view_blocks_path_tricks(self):
+        self.assertEqual(self.client.get("/media/../.env").status_code, 404)
+        self.assertEqual(self.client.get("/media/missing.png").status_code, 404)
+
+    def test_invalid_profile_edit_does_not_change_sidebar(self):
+        make_user("ben@example.com", "HELPER")
+        resp = self.client.post(reverse("accounts:profile_edit"),
+                                {"full_name": "Joy Reyes", "email": "ben@example.com", "contact_number": ""})
+        self.assertIn("email", resp.context["form"].errors)
+        self.assertEqual(resp.context["user"].email, "joy@example.com")

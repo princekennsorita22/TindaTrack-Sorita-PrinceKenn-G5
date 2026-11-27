@@ -1,0 +1,8 @@
+{% extends "error_base.html" %}
+{% block title %}Form expired{% endblock %}
+{% block code %}403{% endblock %}
+{% block content %}
+<h1>This form expired</h1>
+<p>For your security, forms only work for a while after the page loads. Go back, reload the page, and submit again.</p>
+<a class="btn btn-primary" href="/">Go to my dashboard</a>
+{% endblock %}

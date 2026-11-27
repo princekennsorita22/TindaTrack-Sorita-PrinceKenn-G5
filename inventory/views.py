@@ -1,13 +1,25 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError, transaction
 from django.db.models import Count, ProtectedError, Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_http_methods, require_POST, require_safe
 
 from accounts.decorators import role_required
 from accounts.models import User
 
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+
+PAGE_SIZE = 25
+
+
+def paginate(request, queryset):
+    """ISS-03: page long lists. get_page() turns a bad ?page= value into page 1 or the last page."""
+    page = Paginator(queryset, PAGE_SIZE).get_page(request.GET.get("page"))
+    query = request.GET.copy()
+    query.pop("page", None)
+    return page, query.urlencode()
 
 from . import services
 from .forms import (CategoryForm, ProductFilterForm, ProductForm, StockFilterForm,
@@ -17,8 +29,24 @@ from .models import Category, Product, StockMovement
 OWNER = User.Role.OWNER
 
 
+def _save_unique(form, save, field, message):
+    """Save, turning a UNIQUE/CHECK violation from PostgreSQL into a form error instead of a 500.
+
+    The form already checks for duplicates, but two people saving at the same moment can
+    both pass that check; the database constraint is the final guard.
+    """
+    try:
+        with transaction.atomic():
+            save()
+    except IntegrityError:
+        form.add_error(field, message)
+        return False
+    return True
+
+
 # ======================================================================= categories
 @login_required
+@require_safe
 def category_list(request):
     categories = Category.objects.annotate(product_count=Count("products")).select_related("created_by")
     return render(request, "inventory/category_list.html", {"categories": categories})
@@ -32,9 +60,9 @@ def category_create(request):
         if form.is_valid():
             category = form.save(commit=False)
             category.created_by = request.user
-            category.save()
-            messages.success(request, f"Category “{category.name}” added.")
-            return redirect("inventory:category_list")
+            if _save_unique(form, category.save, "name", "A category with this name already exists."):
+                messages.success(request, f"Category “{category.name}” added.")
+                return redirect("inventory:category_list")
         messages.error(request, "The category wasn't added. Fix the highlighted fields.")
     return render(request, "inventory/category_form.html", {"form": form, "is_new": True})
 
@@ -46,10 +74,12 @@ def category_edit(request, pk):
     form = CategoryForm(request.POST or None, instance=category)
     if request.method == "POST":
         if form.is_valid():
-            form.save()
-            messages.success(request, f"Category “{category.name}” saved.")
-            return redirect("inventory:category_list")
+            if _save_unique(form, form.save, "name", "A category with this name already exists."):
+                messages.success(request, f"Category “{category.name}” saved.")
+                return redirect("inventory:category_list")
         messages.error(request, "The category wasn't saved. Fix the highlighted fields.")
+    if form.errors:
+        category = Category.objects.get(pk=category.pk)
     return render(request, "inventory/category_form.html", {"form": form, "category": category})
 
 
@@ -77,6 +107,7 @@ def category_delete(request, pk):
 
 # ======================================================================= products
 @login_required
+@require_safe
 def product_list(request):
     form = ProductFilterForm(request.GET or None)
     products = Product.objects.select_related("category")
@@ -96,8 +127,9 @@ def product_list(request):
         products = products.filter(is_active=True)
     elif status == "inactive":
         products = products.filter(is_active=False)
+    page, page_query = paginate(request, products)
     return render(request, "inventory/product_list.html", {
-        "form": form, "products": products,
+        "form": form, "products": page.object_list, "page_obj": page, "page_query": page_query,
         "has_categories": Category.objects.exists(),
         "inactive_count": Product.objects.filter(is_active=False).count(),
         "filtered": bool(request.GET),
@@ -105,6 +137,7 @@ def product_list(request):
 
 
 @login_required
+@require_safe
 def product_detail(request, pk):
     product = get_object_or_404(Product.objects.select_related("category", "created_by"), pk=pk)
     history = visible_movements(request.user).filter(product=product)[:10]
@@ -122,9 +155,9 @@ def product_create(request):
         if form.is_valid():
             product = form.save(commit=False)
             product.created_by = request.user
-            product.save()
-            messages.success(request, f"Product “{product.name}” added with 0 in stock.")
-            return redirect("inventory:product_detail", pk=product.pk)
+            if _save_unique(form, product.save, "product_code", "Another product already uses this code."):
+                messages.success(request, f"Product “{product.name}” added with 0 in stock.")
+                return redirect("inventory:product_detail", pk=product.pk)
         messages.error(request, "The product wasn't added. Fix the highlighted fields.")
     return render(request, "inventory/product_form.html", {"form": form, "is_new": True})
 
@@ -137,10 +170,12 @@ def product_edit(request, pk):
     form = ProductForm(request.POST or None, instance=product)
     if request.method == "POST":
         if form.is_valid():
-            form.save()
-            messages.success(request, f"Product “{product.name}” saved.")
-            return redirect("inventory:product_detail", pk=product.pk)
+            if _save_unique(form, form.save, "product_code", "Another product already uses this code."):
+                messages.success(request, f"Product “{product.name}” saved.")
+                return redirect("inventory:product_detail", pk=product.pk)
         messages.error(request, "The product wasn't saved. Fix the highlighted fields.")
+    if form.errors:
+        product = Product.objects.get(pk=product.pk)  # show the saved name, not the rejected input
     return render(request, "inventory/product_form.html", {"form": form, "product": product})
 
 
@@ -192,6 +227,7 @@ def visible_movements(user):
 
 
 @login_required
+@require_safe
 def movement_list(request):
     form = StockFilterForm(request.GET or None)
     movements = visible_movements(request.user)
@@ -206,8 +242,10 @@ def movement_list(request):
             movements = movements.filter(movement_date__date__gte=data["date_from"])
         if data.get("date_to"):
             movements = movements.filter(movement_date__date__lte=data["date_to"])
+    page, page_query = paginate(request, movements)
     return render(request, "inventory/movement_list.html", {
-        "form": form, "movements": movements[:200], "filtered": bool(request.GET),
+        "form": form, "movements": page.object_list, "page_obj": page, "page_query": page_query,
+        "filtered": bool(set(request.GET) - {"page"}),
     })
 
 

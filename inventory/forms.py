@@ -86,7 +86,7 @@ class ProductFilterForm(_NoColonForm):
     STOCK_CHOICES = [("", "Any stock level"), ("low", "Low on stock"), ("out", "Out of stock")]
     STATUS_CHOICES = [("active", "Active"), ("inactive", "Deactivated"), ("all", "All")]
 
-    q = forms.CharField(required=False, label="Search",
+    q = forms.CharField(required=False, label="Search", max_length=100,
                         widget=forms.TextInput(attrs={"placeholder": "Name or code", "type": "search"}))
     category = forms.ModelChoiceField(queryset=Category.objects.all(), required=False,
                                       empty_label="All categories")
@@ -196,7 +196,7 @@ class StockMovementEditForm(_QuantityMixin):
 class StockFilterForm(_NoColonForm):
     TYPE_CHOICES = [("", "All types")] + list(StockMovement.Type.choices)
 
-    q = forms.CharField(required=False, label="Product",
+    q = forms.CharField(required=False, label="Product", max_length=100,
                         widget=forms.TextInput(attrs={"placeholder": "Name or code", "type": "search"}))
     type = forms.ChoiceField(choices=TYPE_CHOICES, required=False, label="Type")
     date_from = forms.DateField(required=False, label="From", widget=forms.DateInput(attrs={"type": "date"}))

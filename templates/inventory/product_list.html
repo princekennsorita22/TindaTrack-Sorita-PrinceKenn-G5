@@ -48,7 +48,7 @@
     </tbody>
   </table>
 </div>
-<p class="muted small">{{ products|length }} product{{ products|length|pluralize }} shown.</p>
+{% include "includes/pagination.html" %}
 {% elif filtered %}
 <section class="panel empty-state">
   <h2>No products match</h2>

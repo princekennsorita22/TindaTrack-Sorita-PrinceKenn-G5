@@ -14,12 +14,16 @@
 <div class="shell">
   <aside class="sidebar">
     <a class="brand" href="{% url 'accounts:dashboard' %}">Tinda<span>Track</span></a>
-    <details class="nav-toggle" open>
+    <details class="nav-toggle" id="nav-toggle" open>
       <summary>Menu</summary>
       <nav aria-label="Main">
         {% if user.is_owner %}{% include "includes/nav_owner.html" %}{% else %}{% include "includes/nav_helper.html" %}{% endif %}
       </nav>
     </details>
+    <script>
+      // ISS-04: start the menu collapsed on phones. Without JavaScript it simply stays open.
+      if (window.matchMedia("(max-width: 760px)").matches) document.getElementById("nav-toggle").open = false;
+    </script>
     <div class="sidebar-user">
       <a class="who" href="{% url 'accounts:profile' %}">
         {% include "includes/avatar.html" with u=user size="sm" %}
@@ -40,5 +44,21 @@
   </main>
 </div>
 {% endblock %}
+<script>
+  // Stop double submissions: after a form is sent, its submit buttons are disabled
+  // until the next page loads. The server also redirects after every successful POST.
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (form.dataset.submitted) { event.preventDefault(); return; }
+    form.dataset.submitted = "1";
+    form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; b.setAttribute("aria-busy", "true"); });
+  });
+  window.addEventListener("pageshow", function () {
+    document.querySelectorAll("form[data-submitted]").forEach(function (f) {
+      delete f.dataset.submitted;
+      f.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = false; b.removeAttribute("aria-busy"); });
+    });
+  });
+</script>
 </body>
 </html>
