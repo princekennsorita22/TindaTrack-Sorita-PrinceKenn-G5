@@ -5,6 +5,7 @@ Secrets (SECRET_KEY, DATABASE_URL) are read from a .env file that is NOT
 committed to Git. Copy .env.example to .env and fill in your own values.
 """
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -129,11 +130,13 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 
 # Errors go to the console (and the host's logs) instead of the browser.
+# During `manage.py test` the expected 403/404/500 warnings are hidden so the output stays readable.
+_LOG_LEVEL = "CRITICAL" if sys.argv[1:2] == ["test"] else os.getenv("DJANGO_LOG_LEVEL", "WARNING")
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "loggers": {"django": {"handlers": ["console"], "level": os.getenv("DJANGO_LOG_LEVEL", "WARNING")}},
+    "loggers": {"django": {"handlers": ["console"], "level": _LOG_LEVEL}},
 }
 
 from django.contrib.messages import constants as message_constants  # noqa: E402

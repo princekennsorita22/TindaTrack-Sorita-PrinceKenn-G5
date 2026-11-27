@@ -108,8 +108,7 @@ python manage.py test inventory.tests.test_hardening   # PD3 hardening tests onl
 python manage.py test -v 2                 # show each test's name
 ```
 
-A passing run ends with `OK`. One test deliberately crashes a page to check the custom 500 page,
-so a `RuntimeError: Simulated crash` message in the output is expected.
+A passing run ends with `OK`. Expected warnings (403, 404, the simulated 500) are hidden while tests run.
 
 > **Supabase note:** the database user needs permission to create a database for the test run.
 > If you see `permission denied to create database`, run the tests against a local PostgreSQL
