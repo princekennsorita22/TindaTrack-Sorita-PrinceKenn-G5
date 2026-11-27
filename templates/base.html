@@ -44,5 +44,21 @@
   </main>
 </div>
 {% endblock %}
+<script>
+  // Stop double submissions: after a form is sent, its submit buttons are disabled
+  // until the next page loads. The server also redirects after every successful POST.
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (form.dataset.submitted) { event.preventDefault(); return; }
+    form.dataset.submitted = "1";
+    form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; b.setAttribute("aria-busy", "true"); });
+  });
+  window.addEventListener("pageshow", function () {
+    document.querySelectorAll("form[data-submitted]").forEach(function (f) {
+      delete f.dataset.submitted;
+      f.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = false; b.removeAttribute("aria-busy"); });
+    });
+  });
+</script>
 </body>
 </html>

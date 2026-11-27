@@ -16,7 +16,7 @@
         <td><span class="tag tag-{{ m.role|lower }}">{{ m.get_role_display }}</span></td>
         <td class="row-actions">
           {% if m != user %}
-          <form method="post" action="{% url 'accounts:team_change_role' m.pk %}" class="inline-form" data-once>
+          <form method="post" action="{% url 'accounts:team_change_role' m.pk %}" class="inline-form">
             {% csrf_token %}
             {% if m.role == "HELPER" %}
             <input type="hidden" name="role" value="OWNER">
