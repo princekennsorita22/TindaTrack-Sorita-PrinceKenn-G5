@@ -85,20 +85,54 @@ python manage.py runserver
 
 Open http://127.0.0.1:8000/ and log in.
 
+New sign-ups: the **first** account registered becomes the store owner; everyone after joins as a
+helper. Owners change roles on the **Team** page.
+
 ### Test accounts (created by `seed_demo`)
 | Role | Email | Password |
 |---|---|---|
 | Store owner | owner@tindatrack.test | TindaDemo2026! |
 | Store helper | helper@tindatrack.test | TindaDemo2026! |
 
-## Tests
+## Running the tests
+
+The tests use your PostgreSQL / Supabase connection from `.env`. Django creates a separate
+temporary database named `test_<your database>` and deletes it afterwards, so your real data is not touched.
 
 ```bash
-python manage.py test
+# with your virtual environment active, from the folder that has manage.py
+python manage.py test                      # everything (85 tests)
+python manage.py test accounts             # account feature only
+python manage.py test inventory            # core feature only
+python manage.py test inventory.tests.test_hardening   # PD3 hardening tests only
+python manage.py test -v 2                 # show each test's name
 ```
 
-52 tests: 20 for the account feature and 32 for inventory (CRUD, validation messages, role access,
-own-records-only rules, stock arithmetic, and the PostgreSQL CHECK constraints).
+A passing run ends with `OK`. One test deliberately crashes a page to check the custom 500 page,
+so a `RuntimeError: Simulated crash` message in the output is expected.
+
+> **Supabase note:** the database user needs permission to create a database for the test run.
+> If you see `permission denied to create database`, run the tests against a local PostgreSQL
+> by pointing `DATABASE_URL` in `.env` at it (and `DB_SSL_REQUIRE=False`).
+
+| Test file | What it covers |
+|---|---|
+| `accounts/tests.py` | Registration validation, hashed passwords, login/logout, role dashboards, profile, helper-only sign-up, Team page, protected photo serving |
+| `inventory/tests/test_catalog.py` | Category and product CRUD, validation, owner-only actions, search and filters |
+| `inventory/tests/test_stock.py` | Restocks, adjustments, stock arithmetic, own-records-only rules, pagination |
+| `inventory/tests/test_hardening.py` | Valid and invalid input, login required on every page, blocked access to other users' records, POST-only actions, CSRF, custom 404/500 pages, database constraints, query counts |
+
+## Hardening (PD3)
+- **Validation:** every form validates on the server; business rules (no negative stock, restocks must add,
+  adjustments need a reason, unique names and codes, prices > 0) are also PostgreSQL `CHECK`/`UNIQUE` constraints.
+- **Errors:** custom 400, 403, 404, 500 and "form expired" (CSRF) pages. `DEBUG` comes from `.env` and defaults to `False`.
+- **Access:** every view requires login; roles are checked in the view (`role_required`), not only in templates.
+  Helpers asking for another user's stock entry get a 404.
+- **Requests:** read-only pages accept GET only; deletes and role changes need POST with a CSRF token and
+  show a confirmation page first. Successful POSTs redirect, and the submit button is disabled after one click.
+- **Data integrity:** all foreign keys use `PROTECT` so history is never lost; stock changes run inside
+  `transaction.atomic()` with the product row locked; duplicate-save races become form errors, not crashes.
+- **Uploads:** profile photos must be real JPG/PNG/WebP images up to 2 MB and are served only to logged-in users.
 
 ## Project layout
 ```
