@@ -11,6 +11,7 @@
   <li><span class="soon">Utang ledger</span></li>
   <li><span class="soon">Reports</span></li>
   <li class="nav-group">Account</li>
+  <li><a href="{% url 'accounts:team' %}" {% if name == 'team' %}aria-current="page"{% endif %}>Team</a></li>
   <li><a href="{% url 'accounts:profile' %}" {% if name == 'profile' or name == 'profile_edit' or name == 'password_change' %}aria-current="page"{% endif %}>My profile</a></li>
 </ul>
 {% endwith %}
